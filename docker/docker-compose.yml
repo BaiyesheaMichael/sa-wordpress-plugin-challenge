@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8'
 
 services:
   wordpress:
@@ -18,7 +18,11 @@ services:
     command: ["/bin/bash", "-c", "/post-init.sh && docker-entrypoint.sh apache2-foreground"]
 
   db:
-    image: mysql:5.7
+    # Fix for Silicon Mac
+    image: mysql:8.0
+    platform: linux/arm64
+
+    # image: mysql:5.7
     restart: always
     environment:
       MYSQL_DATABASE: wordpress

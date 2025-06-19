@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Simple Reviews
  * Description: A simple WordPress plugin that registers a custom post type for product reviews and provides REST API support.
- * Version: 1.0.0
- * Author: Your Name
+ * Version: 1.0.1
+ * Author: Michael Baiyeshea
  */
 
 if (!defined('ABSPATH')) {
@@ -12,10 +12,26 @@ if (!defined('ABSPATH')) {
 
 class Simple_Reviews {
     public function __construct() {
-        add_action('init', [$this, 'register_product_review_cpt']);        
+        add_action('init', [$this, 'register_product_review_cpt']);
+
+        // Fix: Rest endpoints "register_rest_routes" was not initialized
+        add_action('rest_api_init', [$this, 'register_rest_routes']);
+
+        // Fix: Initialize shortcodes
+        add_action('init', [$this, 'register_shortcodes']);
+
+    }
+    
+    /**
+     *
+     * Register all Shortcodes here
+     *
+     */
+    public function register_shortcodes() {
+        // Use [product_reviews]
+        add_shortcode( "product_reviews", [ $this, "display_product_reviews" ] );
     }
 
- 
     public function register_product_review_cpt() {
         register_post_type('product_review', [
             'labels'      => [

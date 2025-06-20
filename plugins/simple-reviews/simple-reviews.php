@@ -56,6 +56,109 @@ class Simple_Reviews {
             'callback' => [$this, 'get_review_history'],
             'permission_callback' => '__return_true',
         ]);
+
+        // Outliers
+        register_rest_route( 'mock-api/v1', '/outliers/', [
+            'methods'  => 'GET',
+            'callback' => [$this, 'get_review_outliers'],
+            'permission_callback' => '__return_true',
+        ]);
+    }
+
+    /**
+     *
+     * Get Outliers that deviated too much from the average
+     *
+     */
+    public function get_review_outliers($request) {
+
+        /**
+         *
+         * Pseudocode
+         * 1. Get all posts with post_type = product_review
+         * 2. Get average and use standard deviation to determine the spread
+         * 3. Use s.d to get the threshold
+         * 4. Filter out reviews and return outliers
+         *
+         */
+
+        $return = [];
+
+        $posts = get_posts([
+            "post_type" => "product_review",
+            "post_status" => "publish",
+        ]);
+
+        if( ! empty( $posts ) ){
+            $total = count( $posts );
+            $sum = 0;
+
+            // Get average
+            foreach( $posts as &$p ){
+                $score = get_post_meta( $p->ID, 'sentiment_score', true ) ?? 0.5;
+                $sentiment = get_post_meta( $p->ID, 'sentiment', true ) ?? 'neutral';
+                $p->score = $score;
+                $p->sentiment = $sentiment;
+
+                $sum += $score;
+            }
+
+            $avg = round( $sum / $total, 4 ); // round to 4 decimal places
+
+            // Calculate deviation using normal distribution
+            $sumemd_diff = 0;
+
+            foreach( $posts as $post ){
+                $diff = $post->score - $avg;
+                $sumemd_diff += $diff * $diff;
+            }
+
+            $sd = round( sqrt( $sumemd_diff / $total ), 4 ); // round to 4 decimal places
+            $deviationMetric = $sd;
+            // Rather than hard-coding, we can use standard deviation to get devation using normal distibution 
+            // $deviationMetric = 0.2;
+
+            $lowThreshold = $avg - $deviationMetric;
+            $highThreshold = $avg + $deviationMetric;
+            // print_r( $lowThreshold . '-' . $highThreshold );exit;
+
+            // Filter out reviews based on threshold
+            $data = [];
+            foreach( $posts as $post ){
+                if( $post->score < $lowThreshold || $post->score > $highThreshold ){
+
+                    $pt = [
+                        'ID' => $post->ID,
+                        'title' => $post->post_title,
+                        'content' => $post->post_content,
+                        'sentiment' => $post->sentiment,
+                        'sentiment_score' => $post->score,
+                    ];
+
+                    $data[] = $pt;
+                }
+            }
+
+            if( ! empty( $data ) ){
+                $return = [
+                    "data" => $data,
+                    "meta" => [
+                        'mean' => $avg,
+                        'standard_deviation' => $sd,
+                        'lowThreshold' => $lowThreshold,
+                        'highThreshold' => $highThreshold,
+                    ],
+                ];
+            }else{
+                return new WP_Error( "no_data", "No reviews found with scores that deviated too much from the average", [ 'code' => 500 ] );
+            }
+
+        }else{
+            return new WP_Error( "no_data", "No Product Review Posts Available", [ 'code' => 500 ] );
+        }
+
+        return rest_ensure_response( $return );
+
     }
 
     public function analyze_sentiment($request) {
@@ -117,4 +220,5 @@ class Simple_Reviews {
     }
 }
 
+// Initialization of the Plugin
 new Simple_Reviews();
